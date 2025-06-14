@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flashing Name</title>
+  <!-- Google Fonts - you can choose a stencil-like font -->
+  <link href="https://fonts.googleapis.com/css2?family=Stencil+Std&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      font-family: 'Stencil Std', sans-serif;
+      font-size: 4em;
+      animation: flashColors 2s infinite;
+      letter-spacing: 0.1em;
+    }
+
+    @keyframes flashColors {
+      0% { color: red; }
+      25% { color: blue; }
+      50% { color: yellow; }
+      75% { color: green; }
+      100% { color: red; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Vaibhavi Bulbulee</h1>
+</body>
+</html>
