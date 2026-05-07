@@ -120,6 +120,16 @@ def _print_catalog(as_json: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows default stdout/stderr is cp1252, which crashes on the
+    # non-ASCII chars the model frequently emits (arrows, em dashes,
+    # box-drawing). Reconfigure to UTF-8 with 'replace' so we never
+    # crash on a weird char — at worst we drop a glyph.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     _load_dotenv_if_available()
     args = _build_parser().parse_args(argv)
 
