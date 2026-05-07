@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from pathlib import Path
 
 from claude_agent_sdk import ClaudeAgentOptions, query
@@ -30,29 +31,37 @@ async def _run(prompt: str, cwd: Path) -> int:
     )
 
     last_text = ""
-    async for message in query(prompt=prompt, options=options):
-        # The SDK yields typed messages; we surface assistant text and tool
-        # activity so the user can follow along. Anything unrecognized is
-        # printed via repr so we never silently drop signal.
-        msg_type = type(message).__name__
-        if msg_type == "AssistantMessage":
-            for block in getattr(message, "content", []) or []:
-                text = getattr(block, "text", None)
-                if text:
-                    print(text)
-                    last_text = text
-                tool_name = getattr(block, "name", None)
-                if tool_name:
-                    print(f"[tool] {tool_name}")
-        elif msg_type == "ResultMessage":
-            # Final result envelope — SDK signals end of run here.
-            err = getattr(message, "is_error", False)
-            return 1 if err else 0
-        else:
-            # User/system messages echoed by the SDK; ignore unless debugging.
-            pass
+    result_code: int | None = None
 
-    # Loop ended without an explicit ResultMessage.
+    # Hold the generator explicitly so we can deterministically aclose it.
+    # Returning early from inside `async for` leaves the SDK's internal
+    # async generator partially-iterated; Python's GC-time aclose then
+    # races with the SDK's still-active coroutines and prints a benign
+    # but ugly "aclose(): asynchronous generator is already running" error.
+    gen = query(prompt=prompt, options=options)
+    try:
+        async for message in gen:
+            msg_type = type(message).__name__
+            if msg_type == "AssistantMessage":
+                for block in getattr(message, "content", []) or []:
+                    text = getattr(block, "text", None)
+                    if text:
+                        print(text)
+                        last_text = text
+                    tool_name = getattr(block, "name", None)
+                    if tool_name:
+                        print(f"[tool] {tool_name}")
+            elif msg_type == "ResultMessage":
+                err = getattr(message, "is_error", False)
+                result_code = 1 if err else 0
+                # Keep iterating so the generator finishes naturally.
+            # Other message types (user/system echoes) are ignored.
+    finally:
+        with contextlib.suppress(Exception):
+            await gen.aclose()
+
+    if result_code is not None:
+        return result_code
     return 0 if last_text else 1
 
 
