@@ -1,0 +1,14 @@
+# Example custom macro catalog passed via --macros to test the precedence
+# chain. Contains:
+#   - one NEW macro (FAREXC) not in the bundled catalog
+#   - one OVERRIDE of a bundled entry (FINDC) so we can confirm CLI wins
+
+- name: FAREXC
+  category: file
+  semantics: "Site-specific fare-exchange lookup macro (example only)."
+  java_mapping: "FareExchangeService.lookup(...)."
+
+- name: FINDC
+  category: file
+  semantics: "[OVERRIDE] FINDC at this site goes through the consolidated record cache first."
+  java_mapping: "CachedRecordStore.findByKey(...) — falls through to RecordStore on miss."

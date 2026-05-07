@@ -1,0 +1,272 @@
+# ==========================================================================
+# TPF / ALCS macro catalog
+# ==========================================================================
+# Reference-level defaults sourced from common TPF / ALCS naming conventions.
+# Site-specific macro libraries vary — VALIDATE these entries against your
+# project's actual macro definitions before relying on the Java mappings.
+#
+# To override an entry without editing this file, drop a `macros.yml` at
+# `<project>/.sabre/macros.yml` — entries there win on name collision.
+#
+# Suffix conventions in TPF macro names (rules of thumb, not absolutes):
+#   -C  conditional / standard variant
+#   -W  wait variant (blocks)
+#   -H  hold variant (acquires record-level lock)
+#   -N  no-chain / no-wait variant
+#   -S  short-block variant
+#   -U  unconditional variant
+#
+# Each entry:
+#   name:         macro mnemonic (uppercase)
+#   category:     control | file | memory | io | time | error | diagnostics
+#   semantics:    one-line behavioral description
+#   java_mapping: how to express it in idiomatic Java
+# ==========================================================================
+
+
+# ---- Entry / exit / dispatch ---------------------------------------------
+
+- name: ENTRC
+  category: control
+  semantics: "ALCS program entry point. Caller can resume after BACKC."
+  java_mapping: "Public method on a service class."
+
+- name: ENTNC
+  category: control
+  semantics: "ALCS program entry point with no return path."
+  java_mapping: "Public method whose return value is ignored by callers."
+
+- name: ENTDC
+  category: control
+  semantics: "Deferred entry — scheduled, not invoked synchronously."
+  java_mapping: "Method invoked via an executor or queued task."
+
+- name: ENTSC
+  category: control
+  semantics: "Suspended entry — scheduled for later resumption."
+  java_mapping: "Submit to a ScheduledExecutorService."
+
+- name: BACKC
+  category: control
+  semantics: "Return control to caller of the most recent ENTRC."
+  java_mapping: "Java `return` from the entry method."
+
+- name: EXITC
+  category: control
+  semantics: "Terminate the current transaction / message."
+  java_mapping: "End of request handling — return from the top-level handler."
+
+- name: SWISC
+  category: control
+  semantics: "Switch control to another program in the same entry."
+  java_mapping: "Direct call to another service method, or queue dispatch."
+
+- name: DEFRC
+  category: control
+  semantics: "Defer this entry until a later cycle."
+  java_mapping: "Reschedule via executor."
+
+- name: CREMC
+  category: control
+  semantics: "Create a new ECB / entry to run another program."
+  java_mapping: "Submit a Runnable / CompletableFuture."
+
+- name: ATTAC
+  category: control
+  semantics: "Attach a subordinate ECB that runs in parallel."
+  java_mapping: "Submit a Runnable to an ExecutorService and keep the future."
+
+- name: DETAC
+  category: control
+  semantics: "Detach an attached ECB so it runs independently of the parent."
+  java_mapping: "Fire-and-forget submit — drop the future reference."
+
+- name: LEVTC
+  category: control
+  semantics: "Change the active ECB program level (TPF allows up to 16 nested levels per ECB)."
+  java_mapping: "Usually a no-op in Java — fold the level transition into the normal call graph."
+
+- name: LODIC
+  category: control
+  semantics: "Load a program image into core for execution."
+  java_mapping: "Resolve and inject the target service bean — no explicit load step."
+
+- name: POSTC
+  category: control
+  semantics: "Post an event so a waiting program is dispatched."
+  java_mapping: "Complete a CompletableFuture or signal a Condition."
+
+- name: EVNTC
+  category: control
+  semantics: "Create an event the dispatcher can post against."
+  java_mapping: "Construct a CompletableFuture or CountDownLatch."
+
+- name: EVNWC
+  category: control
+  semantics: "Wait for an event to be posted (blocks the current ECB)."
+  java_mapping: "future.get() or latch.await() at an adapter boundary; avoid in domain logic."
+
+- name: WAITC
+  category: control
+  semantics: "Wait for one or more pending operations to complete."
+  java_mapping: "Use CompletableFuture.allOf(...).join() at the boundary."
+
+- name: DLAYC
+  category: control
+  semantics: "Delay execution for a set interval."
+  java_mapping: "Schedule via ScheduledExecutorService; do not Thread.sleep in domain code."
+
+
+# ---- File / database (TPF file system) -----------------------------------
+
+- name: FINDC
+  category: file
+  semantics: "Find a record in a TPF file by key. Sets RC; record loaded into core block."
+  java_mapping: "RecordStore.findByKey(...). Generate the port if absent."
+
+- name: FINWC
+  category: file
+  semantics: "Find with wait — blocks until record is available."
+  java_mapping: "Synchronous RecordStore.findByKey(...) (Java callers already block)."
+
+- name: FINHC
+  category: file
+  semantics: "Find and hold — acquire a record-level lock on the found record."
+  java_mapping: "RecordStore.findAndLock(...) returning a closeable lease (try-with-resources)."
+
+- name: FINDS
+  category: file
+  semantics: "Find a short-block record. Same lookup semantics as FINDC, smaller block size."
+  java_mapping: "Same as FINDC — block-size distinction does not carry over to Java."
+
+- name: FILEC
+  category: file
+  semantics: "Write the current core block back to the TPF file."
+  java_mapping: "RecordStore.save(record)."
+
+- name: FILUC
+  category: file
+  semantics: "File a record unconditionally (without requiring a prior find/hold)."
+  java_mapping: "RecordStore.save(record) without prior load. Verify lock semantics with the user."
+
+- name: FILNC
+  category: file
+  semantics: "File a record with no chain link to a previous block."
+  java_mapping: "RecordStore.save with no chain pointer; verify chain semantics with the user."
+
+- name: FILSC
+  category: file
+  semantics: "File a short-block record."
+  java_mapping: "Same as FILEC — block-size distinction does not carry over to Java."
+
+- name: UNFRC
+  category: file
+  semantics: "Unfile (delete) a record from the file."
+  java_mapping: "RecordStore.delete(id)."
+
+- name: GETFC
+  category: file
+  semantics: "Get a free file address (allocate a new record slot)."
+  java_mapping: "RecordStore.allocate() returning a record id."
+
+- name: RELFC
+  category: file
+  semantics: "Release a file address obtained from GETFC back to the free pool."
+  java_mapping: "RecordStore.release(id). Only meaningful if your store models a free list."
+
+
+# ---- Memory / core block management --------------------------------------
+
+- name: GETCC
+  category: memory
+  semantics: "Allocate a core block (work buffer)."
+  java_mapping: "Ordinary Java object allocation. Do not model a free list."
+
+- name: RELCC
+  category: memory
+  semantics: "Release a core block."
+  java_mapping: "Drop the reference. Garbage collector handles the rest."
+
+- name: MAXCC
+  category: memory
+  semantics: "Allocate the maximum-size core block."
+  java_mapping: "Plain Java allocation — TPF size class is irrelevant in Java."
+
+- name: COREC
+  category: memory
+  semantics: "Verify a core block address is currently valid."
+  java_mapping: "Drop — Java references are inherently valid or null. Replace with a null check at the boundary."
+
+- name: CALOC
+  category: memory
+  semantics: "Allocate a control block (typed work area)."
+  java_mapping: "Construct the Java object."
+
+- name: CRELC
+  category: memory
+  semantics: "Release a control block."
+  java_mapping: "Drop the reference."
+
+
+# ---- I/O — terminal / message routing ------------------------------------
+
+- name: SENDC
+  category: io
+  semantics: "Send a formatted message back to the originating terminal."
+  java_mapping: "Append to the response payload returned by the entry method."
+
+- name: ROUTC
+  category: io
+  semantics: "Route a message to a specific terminal or queue address."
+  java_mapping: "Publish via a TerminalGateway / MessageRouter port. Generate the port if absent."
+
+- name: RCVMC
+  category: io
+  semantics: "Receive an inbound message into the current ECB."
+  java_mapping: "Inbound parameter on the entry method — do not model inside business logic."
+
+
+# ---- Time / date ---------------------------------------------------------
+
+- name: DATEC
+  category: time
+  semantics: "Get current system date."
+  java_mapping: "Inject a Clock; LocalDate.now(clock)."
+
+- name: TIMEC
+  category: time
+  semantics: "Get current system time."
+  java_mapping: "Inject a Clock; LocalTime.now(clock) or Instant.now(clock)."
+
+- name: GETDC
+  category: time
+  semantics: "Get the date in a specific format."
+  java_mapping: "DateTimeFormatter against an injected Clock."
+
+
+# ---- Errors / diagnostics ------------------------------------------------
+
+- name: SERRC
+  category: error
+  semantics: "Software error — abend the entry."
+  java_mapping: "Throw a domain RuntimeException with the error context."
+
+- name: SYSRC
+  category: error
+  semantics: "System error — abend with a reason code (typically more severe than SERRC)."
+  java_mapping: "Throw a domain RuntimeException; let the boundary translate to a 5xx / system fault."
+
+- name: SNAPC
+  category: diagnostics
+  semantics: "Snapshot — write a diagnostic dump."
+  java_mapping: "Structured log entry at WARN/ERROR level."
+
+- name: DUMPC
+  category: diagnostics
+  semantics: "Force a storage dump for diagnostics."
+  java_mapping: "Structured log at ERROR with relevant context."
+
+- name: TRACEC
+  category: diagnostics
+  semantics: "Write a trace entry to the diagnostic trace table."
+  java_mapping: "Logger.debug or .trace with structured fields."
